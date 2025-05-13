@@ -1,0 +1,26 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# Streamlit
+.streamlit/
+
+# Data directories (if you don't want to include PDFs in repository)
+pdfs/*
+processed_data/*
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
