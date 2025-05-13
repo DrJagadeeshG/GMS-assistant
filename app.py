@@ -1,5 +1,5 @@
-# GMS Tutorial Assistant - Final Version with Improvements
-# Fixed button position and clickable logos/footer
+# GMS Tutorial Assistant - Final Version without Process Button
+# Improved version with automatic loading and no process button display
 
 import streamlit as st
 import os
@@ -218,6 +218,15 @@ a:hover {
     color: #2c5282;
     text-decoration: underline;
 }
+
+/* Info message styling */
+.st-bd {
+    display: none !important;
+}
+
+.stAlert {
+    display: none !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -262,22 +271,16 @@ def preprocess_pdfs():
     
     if not os.path.exists(PDFS_DIR):
         os.makedirs(PDFS_DIR)
-        st.warning("The 'pdfs' directory was created. Please add your GMS tutorial PDFs to this directory.")
         return False
     
     pdf_files = [f for f in os.listdir(PDFS_DIR) if f.endswith('.pdf')]
     
     if not pdf_files:
-        st.warning("No PDF files found in the 'pdfs' directory. Please add your GMS tutorial PDFs.")
         return False
     
-    st.info(f"Processing {len(pdf_files)} PDF files... This may take a moment.")
-    
-    # Process each PDF
+    # Process each PDF silently
     tutorial_data = {}
     all_sections = []
-    
-    progress_bar = st.progress(0)
     
     for idx, pdf_file in enumerate(pdf_files):
         file_path = os.path.join(PDFS_DIR, pdf_file)
@@ -313,11 +316,8 @@ def preprocess_pdfs():
                         sections.append(section)
                         all_sections.append(section)
                 
-                # Update progress
-                progress_bar.progress((idx + 1) / len(pdf_files))
-                
         except Exception as e:
-            st.error(f"Error processing {pdf_file}: {str(e)}")
+            pass
     
     # Create and save TF-IDF vectorizer
     section_texts = [section["content"] for section in all_sections]
@@ -341,8 +341,6 @@ def preprocess_pdfs():
     # Save the timestamp
     with open(os.path.join(DATA_DIR, 'processed_timestamp.txt'), 'w') as f:
         f.write(str(time.time()))
-    
-    progress_bar.empty()
     
     return True
 
@@ -395,7 +393,6 @@ def load_preprocessed_data():
         
         return True
     except Exception as e:
-        st.error(f"Error loading preprocessed data: {str(e)}")
         return False
 
 # Function to search for relevant content
@@ -514,12 +511,16 @@ def handle_input():
 
 # Main function
 def main():
-    # Load data silently if possible
-    data_is_fresh = check_data_freshness()
-    
-    if not st.session_state.data_loaded and data_is_fresh:
-        if load_preprocessed_data():
+    # Load data silently on startup
+    if not st.session_state.data_loaded:
+        # First check if data exists and is fresh
+        if check_data_freshness():
+            load_preprocessed_data()
             st.session_state.data_loaded = True
+        # If not, try to load it anyway (might be partial)
+        elif os.path.exists(DATA_DIR) and os.listdir(DATA_DIR):
+            if load_preprocessed_data():
+                st.session_state.data_loaded = True
     
     # Simple title with built-in images
     col1, col2, col3 = st.columns([1, 3, 1])
@@ -548,37 +549,27 @@ def main():
                     unsafe_allow_html=True
                 )
     
-    # Processing section - only show if data not loaded
-    if not st.session_state.data_loaded and not data_is_fresh:
-        if st.button("Process PDF Tutorials"):
-            if preprocess_pdfs():
-                if load_preprocessed_data():
-                    st.session_state.data_loaded = True
-        else:
-            st.info("PDFs need to be processed. Click the button above to start processing.")
+    # Main interface - always shown now, without process button section
+    # Use explicit class for the prompt text color
+    st.markdown("<div class='question-prompt'>Ask about GMS tutorials:</div>", unsafe_allow_html=True)
     
-    # Input section
-    if st.session_state.data_loaded:
-        # Use explicit class for the prompt text color
-        st.markdown("<div class='question-prompt'>Ask about GMS tutorials:</div>", unsafe_allow_html=True)
+    # Create the input form
+    with st.form(key="query_form", clear_on_submit=True):
+        user_input = st.text_input("", key="input_field", placeholder="Type your question here...")
         
-        # Create the input form
-        with st.form(key="query_form", clear_on_submit=True):
-            user_input = st.text_input("", key="input_field", placeholder="Type your question here...")
-            
-            # Add number of results selection - now directly below the input
-            st.markdown("<div class='results-count-label'>Number of results to show:</div>", unsafe_allow_html=True)
-            num_results = st.selectbox("", options=[3, 5, 10], key="results_count")
-            # Update session state with the selected number
-            st.session_state.num_results = num_results
-            
-            # Center the Ask button
-            col1, col2, col3 = st.columns([3, 1, 3])
-            with col2:
-                submit_button = st.form_submit_button("Ask", on_click=handle_input)
+        # Add number of results selection - now directly below the input
+        st.markdown("<div class='results-count-label'>Number of results to show:</div>", unsafe_allow_html=True)
+        num_results = st.selectbox("", options=[3, 5, 10], key="results_count")
+        # Update session state with the selected number
+        st.session_state.num_results = num_results
+        
+        # Center the Ask button
+        col1, col2, col3 = st.columns([3, 1, 3])
+        with col2:
+            submit_button = st.form_submit_button("Ask", on_click=handle_input)
     
     # Process the submission
-    if st.session_state.submitted_query and st.session_state.data_loaded:
+    if st.session_state.submitted_query:
         # Get the user input
         user_input = st.session_state.input_field
         

@@ -14,13 +14,12 @@ ENV/
 # Streamlit
 .streamlit/
 
-# Data directories (if you don't want to include PDFs in repository)
-pdfs/*
-processed_data/*
-
-# Logs
-*.log
-
 # OS files
 .DS_Store
 Thumbs.db
+
+# Log files
+*.log
+
+# Keep processed_data but exclude any temporary files
+processed_data/*.tmp
