@@ -1,6 +1,3 @@
-# GMS Tutorial Assistant - Final Version without Process Button
-# Improved version with automatic loading and no process button display
-
 import streamlit as st
 import os
 import json
@@ -11,222 +8,56 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 import time
 
-# Page configuration
+# Minimal page configuration with white background
 st.set_page_config(
     page_title="GMS Tutorial Assistant",
     page_icon="📚",
     layout="wide",
-    initial_sidebar_state="collapsed"  # Hide sidebar by default
+    initial_sidebar_state="collapsed"
 )
 
-# Function to convert image to base64
-def get_base64_image(image_path):
-    """Convert an image to base64 encoding"""
-    with open(image_path, "rb") as img_file:
-        return base64.b64encode(img_file.read()).decode()
-
-# Custom CSS for minimal clean design with white background and fixed title color
+# Custom CSS for white background, black general text, but white input text
 st.markdown("""
 <style>
-/* Hide Streamlit elements */
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-
-/* General page styling */
-.stApp {
-    background-color: white;
-}
-
-/* Clean container styling */
-div.block-container {
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-}
-
-/* Success message hiding */
-div.stSuccessMessage {
-    display: none !important;
-}
-
-/* Title styling - with explicit color setting */
-.app-title {
-    font-size: 2.5rem;
-    font-weight: bold;
-    color: #1A202C !important; /* Dark color for the title */
-    text-align: center;
-    margin: 1rem 0;
-}
-
-/* Form styling */
-.stButton > button {
-    background-color: #E53E3E;
-    color: white;
-    border: none;
-    padding: 0.5rem 2rem;
-    font-weight: 500;
-    border-radius: 5px;
-}
-
-.stButton > button:hover {
-    background-color: #C53030;
-}
-
-/* Input field styling */
-input[type="text"] {
-    background-color: #1A202C !important;
-    color: white !important;
-    border-radius: 5px !important;
-    border: none !important;
-    padding: 10px !important;
-}
-
-input[type="text"]::placeholder {
-    color: #A0AEC0 !important;
-}
-
-/* Selectbox styling */
-.stSelectbox > div > div > div {
-    background-color: white !important;
-    color: #1A202C !important;
-}
-
-.stSelectbox label {
-    color: #1A202C !important;
-}
-
-/* PDF link styling */
-.pdf-link {
-    background-color: #f7fafc;
-    border-left: 4px solid #4299E1;
-    padding: 1rem;
-    margin-top: 0.75rem;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.pdf-link-title {
-    font-weight: 600;
-    color: #2c5282;
-    font-size: 1.1rem;
-}
-
-.pdf-link a, .pdf-recommendation a {
-    color: white;
-    text-decoration: none;
-    padding: 0.3rem 0.8rem;
-    border-radius: 4px;
-    background-color: #4299E1;
-    border: none;
-    font-size: 0.85rem;
-    margin-left: 0.8rem;
-    white-space: nowrap;
-    display: inline-block;
-}
-
-.pdf-link a:hover, .pdf-recommendation a:hover {
-    background-color: #3182CE;
-}
-
-.pdf-context {
-    margin-top: 0.8rem;
-    font-style: italic;
-    color: #4a5568;
-    border-left: 2px solid #cbd5e0;
-    padding-left: 0.75rem;
-    font-size: 0.95rem;
-    line-height: 1.5;
-}
-
-.pdf-recommendation {
-    background-color: #f0fff4;
-    border-left: 4px solid #48BB78;
-    padding: 1rem;
-    margin-top: 0.75rem;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-/* Message styling */
-.user-message {
-    background-color: #ebf8ff;
-    color: #2c5282;
-    padding: 1rem;
-    border-radius: 6px;
-    margin-bottom: 1rem;
-    border-left: 4px solid #4299E1;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.assistant-message {
-    background-color: #f7fafc;
-    color: #1a202c;
-    padding: 1rem;
-    border-radius: 6px;
-    margin-bottom: 1rem;
-    border-left: 4px solid #48BB78;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-/* Footer styling */
-.footer {
-    text-align: center;
-    padding: 1rem;
-    color: #4a5568;
-    font-size: 0.9rem;
-    margin-top: 2rem;
-    border-top: 1px solid #e2e8f0;
-}
-
-/* Section headers - with explicit color setting */
-h1, h2, h3, h4, h5, h6 {
-    color: #1A202C !important;
-}
-
-/* Question prompt styling */
-.question-prompt {
-    color: #1A202C !important;
-    font-size: 1.25rem;
-    font-weight: 500;
-    margin-bottom: 0.5rem;
-}
-
-/* Results count label */
-.results-count-label {
-    color: #1A202C !important;
-    font-weight: 500;
-    margin-top: 0.5rem;
-    margin-bottom: 0.5rem;
-}
-
-/* Link styling */
-a {
-    color: inherit;
-    text-decoration: none;
-}
-
-a:hover {
-    text-decoration: underline;
-}
-
-.footer a {
-    color: #4a5568;
-    text-decoration: none;
-}
-
-.footer a:hover {
-    color: #2c5282;
-    text-decoration: underline;
-}
-
-/* Info message styling */
-.st-bd {
-    display: none !important;
-}
-
-.stAlert {
-    display: none !important;
-}
+    .stApp {
+        background-color: white;
+        color: black;
+    }
+    
+    .stButton button {
+        background-color: #E53E3E;
+        color: white;
+        font-weight: 500;
+    }
+    
+    .stButton button:hover {
+        background-color: #C53030;
+    }
+    
+    p, h1, h2, h3, h4, h5, h6, span, div {
+        color: black !important;
+    }
+    
+    .stMarkdown, .stText {
+        color: black !important;
+    }
+    
+    label, .stSelectbox, .stNumberInput {
+        color: black !important;
+    }
+    
+    /* Make input text white since background is dark */
+    input[type="text"], textarea, .stTextInput input, .stNumberInput input {
+        color: white !important;
+        background-color: #1E293B !important;
+        border: 1px solid #4B5563 !important;
+    }
+    
+    /* Style the placeholder text */
+    ::placeholder {
+        color: #94A3B8 !important;
+        opacity: 1 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -242,22 +73,19 @@ if 'data_loaded' not in st.session_state:
     st.session_state.tfidf_matrix = None
     st.session_state.loading_timestamp = None
 
-# Add a state for tracking submitted queries
-if 'submitted_query' not in st.session_state:
-    st.session_state.submitted_query = False
-
-# Store the number of results preference
-if 'num_results' not in st.session_state:
-    st.session_state.num_results = 3
-
-# Suppress "data loaded" message after first load
-if 'suppress_message' not in st.session_state:
-    st.session_state.suppress_message = False
-
 # Data directories
 DATA_DIR = "processed_data"
 PDFS_DIR = "pdfs"
 LOGOS_DIR = "logos"
+
+# Function to convert image to base64
+def get_base64_image(image_path):
+    """Convert an image to base64 encoding"""
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except:
+        return None
 
 # Function to preprocess PDFs and save the data
 def preprocess_pdfs():
@@ -402,24 +230,28 @@ def search_content(query, top_n=5):
     if (st.session_state.tfidf_vectorizer is None) or (st.session_state.tfidf_matrix is None):
         return []
     
-    # Transform the query using the vectorizer
-    query_vector = st.session_state.tfidf_vectorizer.transform([query])
-    
-    # Calculate similarity scores
-    similarity_scores = cosine_similarity(query_vector, st.session_state.tfidf_matrix).flatten()
-    
-    # Get the top N most relevant sections
-    top_indices = similarity_scores.argsort()[:-top_n-1:-1]
-    
-    results = []
-    for idx in top_indices:
-        if similarity_scores[idx] > 0.0:  # Only include relevant results
-            results.append({
-                "section": st.session_state.section_data[idx],
-                "score": float(similarity_scores[idx])
-            })
-    
-    return results
+    try:
+        # Transform the query using the vectorizer
+        query_vector = st.session_state.tfidf_vectorizer.transform([query])
+        
+        # Calculate similarity scores
+        similarity_scores = cosine_similarity(query_vector, st.session_state.tfidf_matrix).flatten()
+        
+        # Get the top N most relevant sections
+        top_indices = similarity_scores.argsort()[:-top_n-1:-1]
+        
+        results = []
+        for idx in top_indices:
+            if similarity_scores[idx] > 0.0:  # Only include relevant results
+                results.append({
+                    "section": st.session_state.section_data[idx],
+                    "score": float(similarity_scores[idx])
+                })
+        
+        return results
+    except Exception as e:
+        # Handle any errors during search
+        return []
 
 # Function to extract keywords from query
 def extract_keywords(query):
@@ -474,10 +306,7 @@ def get_response(query, num_results=3):
             for tutorial in suggested_tutorials:
                 # Create a PDF link
                 pdf_url = f"{s3_base_url}{tutorial}.pdf"
-                response += f"""<div class='pdf-recommendation'>
-                <span class='pdf-link-title'>{tutorial}</span>
-                <a href="{pdf_url}" target="_blank">View PDF Online</a>
-                </div>\n\n"""
+                response += f"{tutorial} - [View PDF]({pdf_url})\n\n"
         else:
             response = "I'm sorry, I couldn't find any relevant information in the available tutorials. Could you try rephrasing your question?"
     else:
@@ -496,116 +325,89 @@ def get_response(query, num_results=3):
             if len(content) > 300:
                 content = content[:300] + "..."
             
-            response += f"""<div class='pdf-link'>
-            <span class='pdf-link-title'>{tutorial_name}</span>
-            <a href="{pdf_url}" target="_blank">View PDF Online</a>
-            <div class='pdf-context'>{content}</div>
-            </div>\n\n"""
+            response += f"**{tutorial_name}** - [View PDF]({pdf_url})\n\n{content}\n\n---\n\n"
     
     return response
 
-# Callback function for form submission
-def handle_input():
-    if st.session_state.input_field:  # Only set submitted flag if there's text
-        st.session_state.submitted_query = True
-
-# Main function
+# Main function - ultra simplified with no custom styling
 def main():
-    # Load data silently on startup
-    if not st.session_state.data_loaded:
-        # First check if data exists and is fresh
-        if check_data_freshness():
-            load_preprocessed_data()
-            st.session_state.data_loaded = True
-        # If not, try to load it anyway (might be partial)
-        elif os.path.exists(DATA_DIR) and os.listdir(DATA_DIR):
-            if load_preprocessed_data():
-                st.session_state.data_loaded = True
-    
-    # Simple title with built-in images
-    col1, col2, col3 = st.columns([1, 3, 1])
+    # Add logos at the top
+    col1, col2, col3 = st.columns([1, 2, 1])
     
     with col1:
         if os.path.exists(os.path.join(LOGOS_DIR, "aquaveo.png")):
-            with st.container():
+            aquaveo_image = get_base64_image(os.path.join(LOGOS_DIR, "aquaveo.png"))
+            if aquaveo_image:
                 st.markdown(
-                    f"""<a href="https://www.aquaveo.com" target="_blank">
-                    <img src="data:image/png;base64,{get_base64_image(os.path.join(LOGOS_DIR, 'aquaveo.png'))}" width="150">
-                    </a>""",
+                    f'<a href="https://www.aquaveo.com" target="_blank"><img src="data:image/png;base64,{aquaveo_image}" width="150"></a>',
                     unsafe_allow_html=True
                 )
     
     with col2:
-        # Use explicit dark color for the title
-        st.markdown("<h1 class='app-title'>GMS Tutorial Assistant</h1>", unsafe_allow_html=True)
+        # Title - centered
+        st.title("GMS Tutorial Assistant")
     
     with col3:
         if os.path.exists(os.path.join(LOGOS_DIR, "SmartBhujalLogo.png")):
-            with st.container():
+            smartbhujal_image = get_base64_image(os.path.join(LOGOS_DIR, "SmartBhujalLogo.png"))
+            if smartbhujal_image:
                 st.markdown(
-                    f"""<a href="https://www.smartbhujal.com" target="_blank">
-                    <img src="data:image/png;base64,{get_base64_image(os.path.join(LOGOS_DIR, 'SmartBhujalLogo.png'))}" width="150">
-                    </a>""",
+                    f'<a href="https://www.smartbhujal.com" target="_blank"><img src="data:image/png;base64,{smartbhujal_image}" width="150"></a>',
                     unsafe_allow_html=True
                 )
     
-    # Main interface - always shown now, without process button section
-    # Use explicit class for the prompt text color
-    st.markdown("<div class='question-prompt'>Ask about GMS tutorials:</div>", unsafe_allow_html=True)
+    # Simple introduction
+    st.write("""
+    This tool helps you search through GMS (Groundwater Modeling System) tutorials 
+    and find the information you need quickly.
+    """)
     
-    # Create the input form
-    with st.form(key="query_form", clear_on_submit=True):
-        user_input = st.text_input("", key="input_field", placeholder="Type your question here...")
-        
-        # Add number of results selection - now directly below the input
-        st.markdown("<div class='results-count-label'>Number of results to show:</div>", unsafe_allow_html=True)
-        num_results = st.selectbox("", options=[3, 5, 10], key="results_count")
-        # Update session state with the selected number
-        st.session_state.num_results = num_results
-        
-        # Center the Ask button
-        col1, col2, col3 = st.columns([3, 1, 3])
-        with col2:
-            submit_button = st.form_submit_button("Ask", on_click=handle_input)
+    # Basic feature list
+    st.markdown("✓ Search across multiple GMS tutorials")
+    st.markdown("✓ Get direct links to relevant PDF tutorials")
+    st.markdown("✓ Find specific sections that answer your questions")
+    st.markdown("✓ Control how many results you want to see")
     
-    # Process the submission
-    if st.session_state.submitted_query:
-        # Get the user input
-        user_input = st.session_state.input_field
-        
-        # Clear previous messages - only keep current query and response
-        st.session_state.messages = []
-        
-        # Add user message to chat
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        
-        # Get response using the specified number of results
-        with st.spinner("Searching tutorials..."):
-            response = get_response(user_input, num_results=st.session_state.num_results)
-        
-        # Add assistant response to chat
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        
-        # Reset the submitted flag
-        st.session_state.submitted_query = False
-        
-        # Use st.rerun() to update the UI
-        st.rerun()
+    # Add a separator
+    st.markdown("---")
     
-    # Results section - only show if there are messages
-    if st.session_state.messages:
-        # Use explicit color for the header
-        st.markdown("<h3 style='color: #1A202C !important;'>Results</h3>", unsafe_allow_html=True)
-        
-        # Display chat messages
-        for message in st.session_state.messages:
-            if message["role"] == "user":
-                st.markdown(f"<div class='user-message'>{message['content']}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<div class='assistant-message'>{message['content']}</div>", unsafe_allow_html=True)
+    # ULTRA SIMPLE INPUT FIELD - no custom styling at all
+    st.subheader("Ask about GMS tutorials:")
+    user_input = st.text_input("Type your question here:", key="query")
     
-    # Footer with clickable link
-    st.markdown("<div class='footer'>Developed by <a href='https://www.smartbhujal.com' target='_blank'><b>Smart Bhujal</b></a>, an official reseller of GMS software in India.</div>", unsafe_allow_html=True)
+    # Simple number selector
+    num_results = st.number_input(
+        "Number of results to show:",
+        min_value=3,
+        max_value=50,
+        value=5,
+        step=1
+    )
+    
+    # Basic search button
+    if st.button("Search"):
+        if user_input:
+            # Search function
+            with st.spinner("Searching..."):
+                response = get_response(user_input, num_results=num_results)
+            
+            # Display results
+            st.subheader("Results:")
+            st.markdown(response)
+    
+    # Footer
+    st.markdown("---")
+    st.markdown("Developed by [Smart Bhujal](https://www.smartbhujal.com), an official reseller of GMS software in India.")
+    st.markdown("For more information, write to info@smartbhujal.com")
 
 if __name__ == "__main__":
+    # Load data silently on startup if available
+    if not st.session_state.data_loaded:
+        if check_data_freshness():
+            load_preprocessed_data()
+            st.session_state.data_loaded = True
+        elif os.path.exists(DATA_DIR) and os.listdir(DATA_DIR):
+            if load_preprocessed_data():
+                st.session_state.data_loaded = True
+    
     main()
