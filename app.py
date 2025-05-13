@@ -373,7 +373,7 @@ def main():
     
     # ULTRA SIMPLE INPUT FIELD - no custom styling at all
     st.subheader("Ask about GMS tutorials:")
-    user_input = st.text_input("Type your question here:", key="query")
+    user_input = st.text_input("Type your question here (Be as descriptive as possible):", key="query")
     
     # Simple number selector
     num_results = st.number_input(
