@@ -58,6 +58,49 @@ st.markdown("""
         color: #94A3B8 !important;
         opacity: 1 !important;
     }
+    
+    /* Styling for wiki search results */
+    .wiki-result {
+        background-color: #f0f9ff;
+        border-left: 4px solid #3b82f6;
+        padding: 1rem;
+        margin-top: 0.75rem;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .wiki-result-title {
+        font-weight: 600;
+        color: #1e40af;
+        font-size: 1.1rem;
+    }
+    
+    .wiki-link {
+        color: white;
+        text-decoration: none;
+        padding: 0.3rem 0.8rem;
+        border-radius: 4px;
+        background-color: #3b82f6;
+        border: none;
+        font-size: 0.85rem;
+        margin-left: 0.8rem;
+        white-space: nowrap;
+        display: inline-block;
+    }
+    
+    .wiki-link:hover {
+        background-color: #2563eb;
+    }
+    
+    .wiki-context {
+        margin-top: 0.8rem;
+        font-style: italic;
+        color: #4a5568;
+        border-left: 2px solid #cbd5e0;
+        padding-left: 0.75rem;
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -72,11 +115,16 @@ if 'data_loaded' not in st.session_state:
     st.session_state.tfidf_vectorizer = None
     st.session_state.tfidf_matrix = None
     st.session_state.loading_timestamp = None
+    # Wiki data
+    st.session_state.wiki_sections = []
+    st.session_state.wiki_vectorizer = None
+    st.session_state.wiki_tfidf_matrix = None
 
 # Data directories
 DATA_DIR = "processed_data"
 PDFS_DIR = "pdfs"
 LOGOS_DIR = "logos"
+WIKI_DATA_DIR = "wiki_data"  # New directory for wiki data
 
 # Function to convert image to base64
 def get_base64_image(image_path):
@@ -219,9 +267,36 @@ def load_preprocessed_data():
         with open(os.path.join(DATA_DIR, 'processed_timestamp.txt'), 'r') as f:
             st.session_state.loading_timestamp = float(f.read().strip())
         
+        # Try to load wiki data if it exists
+        try:
+            load_wiki_data()
+        except Exception as e:
+            print(f"Wiki data not loaded: {e}")
+        
         return True
     except Exception as e:
         return False
+
+# Function to load wiki data
+def load_wiki_data():
+    """Load wiki data for searching"""
+    # Check if wiki data exists
+    if not os.path.exists(WIKI_DATA_DIR):
+        return False
+    
+    # Load wiki sections
+    with open(os.path.join(WIKI_DATA_DIR, 'wiki_sections.json'), 'r', encoding='utf-8') as f:
+        st.session_state.wiki_sections = json.load(f)
+    
+    # Load wiki vectorizer
+    with open(os.path.join(WIKI_DATA_DIR, 'wiki_vectorizer.pkl'), 'rb') as f:
+        st.session_state.wiki_vectorizer = pickle.load(f)
+    
+    # Load wiki TF-IDF matrix
+    with open(os.path.join(WIKI_DATA_DIR, 'wiki_tfidf_matrix.pkl'), 'rb') as f:
+        st.session_state.wiki_tfidf_matrix = pickle.load(f)
+    
+    return True
 
 # Function to search for relevant content
 def search_content(query, top_n=5):
@@ -245,12 +320,45 @@ def search_content(query, top_n=5):
             if similarity_scores[idx] > 0.0:  # Only include relevant results
                 results.append({
                     "section": st.session_state.section_data[idx],
-                    "score": float(similarity_scores[idx])
+                    "score": float(similarity_scores[idx]),
+                    "type": "pdf"
                 })
         
         return results
     except Exception as e:
         # Handle any errors during search
+        return []
+
+# Function to search wiki content
+def search_wiki_content(query, top_n=5):
+    """Search for relevant content in the wiki using TF-IDF"""
+    # Check if wiki data is loaded
+    if (st.session_state.wiki_vectorizer is None) or (st.session_state.wiki_tfidf_matrix is None):
+        return []
+    
+    try:
+        # Transform the query using the wiki vectorizer
+        query_vector = st.session_state.wiki_vectorizer.transform([query])
+        
+        # Calculate similarity scores
+        similarity_scores = cosine_similarity(query_vector, st.session_state.wiki_tfidf_matrix).flatten()
+        
+        # Get the top N most relevant sections
+        top_indices = similarity_scores.argsort()[:-top_n-1:-1]
+        
+        results = []
+        for idx in top_indices:
+            if similarity_scores[idx] > 0.0:  # Only include relevant results
+                results.append({
+                    "section": st.session_state.wiki_sections[idx],
+                    "score": float(similarity_scores[idx]),
+                    "type": "wiki"
+                })
+        
+        return results
+    except Exception as e:
+        # Handle any errors during search
+        print(f"Error searching wiki: {e}")
         return []
 
 # Function to extract keywords from query
@@ -288,18 +396,29 @@ def suggest_tutorials(keywords, num_results=3):
     return [name for name, score in sorted_tutorials[:num_results]]
 
 # Function to generate a response
-def get_response(query, num_results=3):
-    """Generate a response based on the user query with PDF links"""
-    # First, search for relevant content
-    search_results = search_content(query, top_n=max(5, num_results))
+def get_response(query, num_results=3, search_pdfs=True, search_wiki=True):
+    """Generate a response based on the user query with PDF links and wiki links"""
+    # First, search for relevant content in PDFs and wiki based on filters
+    pdf_results = []
+    wiki_results = []
+    
+    if search_pdfs:
+        pdf_results = search_content(query, top_n=max(5, num_results))
+    
+    if search_wiki:
+        wiki_results = search_wiki_content(query, top_n=max(5, num_results))
     
     # Base URL for online PDFs
     s3_base_url = "https://s3.amazonaws.com/gmstutorials-10.8.aquaveo.com/"
     
-    if not search_results:
+    # Check if we have any results from either source
+    if not pdf_results and not wiki_results:
         # No direct matches, suggest tutorials based on keywords
         keywords = extract_keywords(query)
-        suggested_tutorials = suggest_tutorials(keywords, num_results)
+        suggested_tutorials = []
+        
+        if search_pdfs:
+            suggested_tutorials = suggest_tutorials(keywords, num_results)
         
         if suggested_tutorials:
             response = "I couldn't find specific information about that, but these tutorials might be helpful:\n\n"
@@ -308,24 +427,59 @@ def get_response(query, num_results=3):
                 pdf_url = f"{s3_base_url}{tutorial}.pdf"
                 response += f"{tutorial} - [View PDF]({pdf_url})\n\n"
         else:
-            response = "I'm sorry, I couldn't find any relevant information in the available tutorials. Could you try rephrasing your question?"
+            sources = []
+            if search_pdfs:
+                sources.append("tutorials")
+            if search_wiki:
+                sources.append("wiki pages")
+            
+            source_text = " or ".join(sources)
+            response = f"I'm sorry, I couldn't find any relevant information in the available {source_text}. Could you try rephrasing your question?"
     else:
-        # Format the search results
-        response = f"Here's what I found in the GMS tutorials (showing {min(len(search_results), num_results)} results):\n\n"
+        # Format the search results in categories
+        response = f"Here's what I found for '{query}':\n\n"
         
-        for i, result in enumerate(search_results[:num_results]):  # Show top N results
-            section = result["section"]
-            content = section["content"]
-            tutorial_name = section["tutorial"]
+        # PDF RESULTS SECTION
+        if pdf_results:
+            response += "## 📚 Tutorial PDFs\n\n"
             
-            # Create a PDF link
-            pdf_url = f"{s3_base_url}{tutorial_name}.pdf"
+            # Show only up to the requested number of results
+            for i, result in enumerate(pdf_results[:num_results]):
+                section = result["section"]
+                content = section["content"]
+                tutorial_name = section["tutorial"]
+                
+                # Create a PDF link
+                pdf_url = f"{s3_base_url}{tutorial_name}.pdf"
+                
+                # Truncate content if too long
+                if len(content) > 300:
+                    content = content[:300] + "..."
+                
+                response += f"**{tutorial_name}** - [View PDF]({pdf_url})\n\n{content}\n\n---\n\n"
+        
+        # WIKI RESULTS SECTION
+        if wiki_results:
+            response += "## 🌐 GMS Wiki Documentation\n\n"
             
-            # Truncate content if too long
-            if len(content) > 300:
-                content = content[:300] + "..."
-            
-            response += f"**{tutorial_name}** - [View PDF]({pdf_url})\n\n{content}\n\n---\n\n"
+            # Show only up to the requested number of results
+            for i, result in enumerate(wiki_results[:num_results]):
+                section = result["section"]
+                title = section.get("title", "Wiki Section")
+                content = section["content"]
+                url = section["url"]
+                parent_title = section.get("parent_title", "")
+                
+                # Format the wiki section title
+                display_title = title
+                if parent_title and parent_title != title:
+                    display_title = f"{parent_title} - {title}"
+                
+                # Truncate content if too long
+                if len(content) > 300:
+                    content = content[:300] + "..."
+                
+                response += f"**{display_title}** - [View Wiki Page]({url})\n\n{content}\n\n---\n\n"
     
     return response
 
@@ -359,13 +513,14 @@ def main():
     # Simple introduction
     st.write("""
     This tool helps you search through GMS (Groundwater Modeling System) tutorials 
-    and find the information you need quickly.
+    and documentation to find the information you need quickly.
     """)
     
     # Basic feature list
     st.markdown("✓ Search across multiple GMS tutorials")
     st.markdown("✓ Get direct links to relevant PDF tutorials")
     st.markdown("✓ Find specific sections that answer your questions")
+    st.markdown("✓ Search the GMS Wiki documentation")
     st.markdown("✓ Control how many results you want to see")
     
     # Add a separator
@@ -373,23 +528,41 @@ def main():
     
     # ULTRA SIMPLE INPUT FIELD - no custom styling at all
     st.subheader("Ask about GMS tutorials:")
-    user_input = st.text_input("Type your question here (Be as descriptive as possible):", key="query")
+    user_input = st.text_input("Type your question here:", key="query")
     
-    # Simple number selector
-    num_results = st.number_input(
-        "Number of results to show:",
-        min_value=3,
-        max_value=50,
-        value=5,
-        step=1
-    )
+    # Create a row with two columns for number selection and category preference
+    col1, col2 = st.columns(2)
     
-    # Basic search button
+    with col1:
+        # Simple number selector
+        num_results = st.number_input(
+            "Number of results per category:",
+            min_value=1,
+            max_value=20,
+            value=3,
+            step=1
+        )
+    
+    with col2:
+        # Category filter
+        category_filter = st.multiselect(
+            "Show results from:",
+            options=["PDF Tutorials", "Wiki Documentation"],
+            default=["PDF Tutorials", "Wiki Documentation"]
+        )
+    
+    # Process the form submission
     if st.button("Search"):
         if user_input:
             # Search function
             with st.spinner("Searching..."):
-                response = get_response(user_input, num_results=num_results)
+                # Adjust search based on category filter
+                search_pdfs = "PDF Tutorials" in category_filter
+                search_wiki = "Wiki Documentation" in category_filter
+                
+                # Get response with category filters
+                response = get_response(user_input, num_results=num_results, 
+                                       search_pdfs=search_pdfs, search_wiki=search_wiki)
             
             # Display results
             st.subheader("Results:")
@@ -399,6 +572,11 @@ def main():
     st.markdown("---")
     st.markdown("Developed by [Smart Bhujal](https://www.smartbhujal.com), an official reseller of GMS software in India.")
     st.markdown("For more information, write to info@smartbhujal.com")
+    
+    # Add wiki data status
+    if os.path.exists(WIKI_DATA_DIR):
+        st.markdown("---")
+        st.markdown("**Wiki Integration Status:** The system includes searchable GMS Wiki content.")
 
 if __name__ == "__main__":
     # Load data silently on startup if available
